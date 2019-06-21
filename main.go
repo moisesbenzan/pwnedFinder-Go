@@ -23,7 +23,7 @@ type ParserArgs struct {
 	printVersion *bool
 	target       *[]string
 	findDumps    *bool
-	targetFile   *os.File
+	targetFile   *string
 }
 
 // End of ParserArgs
@@ -111,15 +111,16 @@ func initParser() ParserArgs {
 	args.findDumps = parser.Flag("D", "find-dumps", &argparse.Options{Help: "Attempts to find a downloadable dump containing the target's password or hash", Default: false})
 	args.printVersion = parser.Flag("V", "version", &argparse.Options{Help: "Prints the version information and exits."})
 	args.target = parser.List("t", "target", &argparse.Options{Help: "List of targets to search for pwned Credentials."})
-	args.targetFile = parser.File("T", "target-file", os.O_RDONLY, 0444, &argparse.Options{Help: "Loads targets from a file."})
+	args.targetFile = parser.String("T", "target-file", &argparse.Options{Help: "Loads targets from a file."})
 
 	// Parse input
 	err := parser.Parse(os.Args)
 
-	if err != nil {
+	if (err != nil) || (len(os.Args) < 2) {
 		// In case of error print error and print usage
 		// This can also be done by passing -h or --help flags
 		fmt.Print(parser.Usage(err))
+		os.Exit(1)
 	}
 
 	if *args.printVersion {
@@ -235,7 +236,12 @@ func searchDumps(Target *PwnedTarget) {
 	}
 }
 
-func loadTargetsFromFile(file *os.File) []string {
+func loadTargetsFromFile(targetFile *string) []string {
+
+	file, err := os.Open(*targetFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	defer file.Close()
 	var targets []string
@@ -253,10 +259,11 @@ func main() {
 	parsedArgs := initParser()
 
 	//Finally print the collected string
-	fmt.Println(*parsedArgs.findDumps)
+	//fmt.Println(len(*parsedArgs.targetFile))
 	var runTargets []string
 
-	if parsedArgs.targetFile != nil {
+	if len(*parsedArgs.targetFile) != 0 {
+		// TODO fix this condition
 		runTargets = loadTargetsFromFile(parsedArgs.targetFile)
 	} else {
 		runTargets = *parsedArgs.target
